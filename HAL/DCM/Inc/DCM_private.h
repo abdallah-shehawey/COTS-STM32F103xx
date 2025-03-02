@@ -1,20 +1,19 @@
 /**
  **===========================================================================**
- **<<<<<<<<<<<<<<<<<<<<<<<<<<    RCC_private.h    >>>>>>>>>>>>>>>>>>>>>>>>>>>>**
+ **<<<<<<<<<<<<<<<<<<<<<<<<<<    DCM_private.h      >>>>>>>>>>>>>>>>>>>>>>>>>>**
  **                                                                           **
  **                  Author : Abdallah Abdelmoemen Shehawey                   **
- **                  Layer  : MCAL                                            **
+ **                  Layer  : HAL                                             **
  **                  CPU    : Cortex-M3                                       **
- **                  MCU    : F103C8T6                                        **
- **                  SWC    : RCC                                             **
+ **                  MCU    : STM32F103C8T6                                   **
+ **                  SWC    : DCM                                             **
  **                                                                           **
  **===========================================================================**
  */
 
-#ifndef MCAL_RCC_PRIVATE_H_
-#define MCAL_RCC_PRIVATE_H_
+#ifndef HAL_DCM_PRIVATE_H_
+#define HAL_DCM_PRIVATE_H_
 
-#define PLL_CONFIG_MASK 0XF
-#define SYS_CLK_MASK 0X3
+/* No private macros or definitions needed for basic DC motor functionality */
 
-#endif /* MCAL_RCC_PRIVATE_H_ */
+#endif /* HAL_DCM_PRIVATE_H_ */

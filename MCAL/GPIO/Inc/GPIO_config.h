@@ -1,20 +1,19 @@
 /**
  **===========================================================================**
- **<<<<<<<<<<<<<<<<<<<<<<<<<<    RCC_private.h    >>>>>>>>>>>>>>>>>>>>>>>>>>>>**
+ **<<<<<<<<<<<<<<<<<<<<<<<<<<    GPIO_config.h      >>>>>>>>>>>>>>>>>>>>>>>>>>**
  **                                                                           **
  **                  Author : Abdallah Abdelmoemen Shehawey                   **
  **                  Layer  : MCAL                                            **
  **                  CPU    : Cortex-M3                                       **
- **                  MCU    : F103C8T6                                        **
- **                  SWC    : RCC                                             **
+ **                  MCU    : STM32F103C8T6                                   **
+ **                  SWC    : GPIO                                            **
  **                                                                           **
  **===========================================================================**
  */
 
-#ifndef MCAL_RCC_PRIVATE_H_
-#define MCAL_RCC_PRIVATE_H_
+#ifndef GPIO_CONFIG_H_
+#define GPIO_CONFIG_H_
 
-#define PLL_CONFIG_MASK 0XF
-#define SYS_CLK_MASK 0X3
+/* No configuration options needed for basic GPIO functionality */
 
-#endif /* MCAL_RCC_PRIVATE_H_ */
+#endif /* GPIO_CONFIG_H_ */

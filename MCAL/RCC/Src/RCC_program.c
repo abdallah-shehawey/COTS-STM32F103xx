@@ -11,15 +11,15 @@
  **===========================================================================**
  */
 
-#include "../../LIB/STD_TYPES.h"
-#include "../../LIB/STD_MACROS.h"
+#include "ErrTypes.h"
+#include "STD_MACROS.h"
 
 #include <stdint.h>
 
-#include "RCC_config.h"
-#include "RCC_interface.h"
-#include "RCC_register.h"
-#include "RCC_private.h"
+#include "../Inc/RCC_interface.h"
+#include "../Inc/RCC_config.h"
+
+#include "../Inc/RCC_private.h"
 
 static u8 RCC_u8State = IDLE;
 

@@ -1,20 +1,23 @@
 /**
  **===========================================================================**
- **<<<<<<<<<<<<<<<<<<<<<<<<<<    RCC_private.h    >>>>>>>>>>>>>>>>>>>>>>>>>>>>**
+ **<<<<<<<<<<<<<<<<<<<<<<<<<    SYSTIC_config.h      >>>>>>>>>>>>>>>>>>>>>>>>**
  **                                                                           **
  **                  Author : Abdallah Abdelmoemen Shehawey                   **
  **                  Layer  : MCAL                                            **
  **                  CPU    : Cortex-M3                                       **
- **                  MCU    : F103C8T6                                        **
- **                  SWC    : RCC                                             **
+ **                  MCU    : STM32F103C8T6                                   **
+ **                  SWC    : SYSTIC                                          **
  **                                                                           **
  **===========================================================================**
  */
 
-#ifndef MCAL_RCC_PRIVATE_H_
-#define MCAL_RCC_PRIVATE_H_
+#ifndef MCAL_SYSTIC_CONFIG_H_
+#define MCAL_SYSTIC_CONFIG_H_
 
-#define PLL_CONFIG_MASK 0XF
-#define SYS_CLK_MASK 0X3
+/* System clock frequency in Hz */
+#define SYSTEM_CLOCK_FREQ 72000000UL /* 72 MHz for STM32F103C8T6 */
 
-#endif /* MCAL_RCC_PRIVATE_H_ */
+/* Clock source selection */
+#define SYSTICK_CLOCK_SOURCE SYSTICK_CLK_AHB_DIV8 /* AHB/8 by default */
+
+#endif /* MCAL_SYSTIC_CONFIG_H_ */

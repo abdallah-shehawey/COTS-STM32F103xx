@@ -14,7 +14,8 @@
 #ifndef MCAL_RCC_INTERFACE_H_
 #define MCAL_RCC_INTERFACE_H_
 
-#include "../../LIB/STD_TYPES.h"
+#include <stdint.h>
+#include "ErrTypes.h"
 
 /* Define Bus in uC*/
 typedef enum
@@ -169,13 +170,13 @@ typedef enum
 }PER_EN_t            ;
 
 /* functions defination */
-ErrorStatus RCC_enumSetClkSts  (uint8_t Copy_u8CLK, uint8_t Copy_u8Status                     );
-ErrorStatus RCC_enumSetSysClk  (uint8_t Copy_u8CLK                                            );
-ErrorStatus RCC_enumPLLConfig  (uint8_t Copy_u8PLLSrc, uint8_t Copy_u8PLLMul                  );
-ErrorStatus RCC_enumAHBConfig  (u8 Copy_u8AHPDiv                                              );
-ErrorStatus RCC_enumAPB1Config (u8 Copy_u8APB1Div                                             );
-ErrorStatus RCC_enumAPB2Config (u8 Copy_u8APB2Div                                             );
-ErrorStatus RCC_enumAHPPerSts  (uint8_t Copy_u8AHPPer, uint8_t Copy_u8Status                  );
-ErrorStatus RCC_enumABPPerSts(uint8_t Copy_u8Bus, uint8_t Copy_u8AHPPer, uint8_t Copy_u8Status);
+ErrorState_t RCC_enumSetClkSts(uint8_t Copy_u8CLK, uint8_t Copy_u8Status);
+ErrorState_t RCC_enumSetSysClk  (uint8_t Copy_u8CLK);
+ErrorState_t RCC_enumPLLConfig(uint8_t Copy_u8PLLSrc, uint8_t Copy_u8PLLMul);
+ErrorState_t RCC_enumAHBConfig(uint8_t Copy_u8AHPDiv);
+ErrorState_t RCC_enumAPB1Config(uint8_t Copy_u8APB1Div);
+ErrorState_t RCC_enumAPB2Config(uint8_t Copy_u8APB2Div);
+ErrorState_t RCC_enumAHPPerSts(uint8_t Copy_u8AHPPer, uint8_t Copy_u8Status);
+ErrorState_t RCC_enumABPPerSts(uint8_t Copy_u8Bus, uint8_t Copy_u8AHPPer, uint8_t Copy_u8Status);
 
 #endif /* MCAL_RCC_INTERFACE_H_ */
