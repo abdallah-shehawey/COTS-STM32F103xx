@@ -1,291 +1,246 @@
 /**
  **===========================================================================**
- **<<<<<<<<<<<<<<<<<<<<<<<<<    SYSTIC_program.c     >>>>>>>>>>>>>>>>>>>>>>>>**
+ **<<<<<<<<<<<<<<<<<<<<<<<<<<    SYSTIC_program.c    >>>>>>>>>>>>>>>>>>>>>>>>>**
  **                                                                           **
  **                  Author : Abdallah Abdelmoemen Shehawey                   **
  **                  Layer  : MCAL                                            **
  **                  CPU    : Cortex-M3                                       **
- **                  MCU    : STM32F103C8T6                                   **
+ **                  MCU    : F103C8T6                                        **
  **                  SWC    : SYSTIC                                          **
  **                                                                           **
  **===========================================================================**
  */
 
 #include <stdint.h>
-#include "STM32F103xx.h"
-#include "ErrorStates.h"
-#include "SYSTIC_interface.h"
-#include "SYSTIC_private.h"
-#include "SYSTIC_config.h"
+#include "STM32F446xx.h"
+#include "ErrTypes.h"
 
-/* Private variables */
-static void (*SYSTICK_CallBack)(void) = NULL;
-static uint8_t SYSTICK_IntervalMode;
+#include "../Inc/SYSTIC_interface.h"
+#include "../Inc/SYSTIC_private.h"
+#include "../Inc/SYSTIC_config.h"
 
+/*=================================================================================================================*/
 /**
- * @fn     SYSTICK_enumInit
- * @brief  Initialize the SysTick timer with configured settings
- * @param  ClockSource: Clock source for SysTick (AHB or AHB/8)
- * @retval ErrorState_t: OK if successful, NOK if error
+ * @fn SYSTIC_vInit
+ * @brief Initialize and configure the SysTick timer
+ * @details This function performs the following configurations:
+ *          1. Sets up the clock source based on SYSTIC_CLKSOURCE configuration
+ *             - AHB clock: Maximum precision but higher power consumption
+ *             - AHB/8: Lower precision but more power efficient
+ *          2. Configures the interrupt state based on SYSTIC_TICKINT
+ *             - Enabled: Timer will generate exceptions
+ *             - Disabled: Polling mode operation
+ *
+ * @note This function must be called before using any other SYSTIC functions
+ * @warning Ensure system clock is properly configured before calling this function
  */
-ErrorState_t SYSTICK_enumInit(SYSTICK_CLKSource_t ClockSource)
+void SYSTIC_vInit(void)
 {
-  ErrorState_t Local_ErrorState = OK;
-
-  /* Disable SysTick first */
-  MSYSTIC->CTRL = 0;
-
   /* Configure clock source */
-  if (ClockSource == SYSTICK_CLK_AHB)
-  {
-    MSYSTIC->CTRL |= (1 << SYSTICK_CTRL_CLKSOURCE);
-  }
-  /* else AHB/8 is selected by default */
+#if SYSTIC_CLKSOURCE == CLK_SOURCE_AHB
+  /* Use processor clock (AHB) for maximum precision */
+  MSYSTIC->CTRL |= (1u << SYSTIC_CTRL_CLKSOURCE);
 
-  return Local_ErrorState;
+#elif SYSTIC_CLKSOURCE == CLK_SOURCE_AHB_DIV8
+  /* Use processor clock divided by 8 for power efficiency */
+  MSYSTIC->CTRL &= (~(1u << SYSTIC_CTRL_CLKSOURCE));
+
+#else
+#error "Invalid SYSTIC Clock Source Configuration"
+#endif
+
+  /* Configure interrupt generation */
+#if SYSTIC_TICKINT == ENABLE
+  /* Enable SysTick exception generation */
+  MSYSTIC->CTRL |= (1u << SYSTIC_CTRL_TICKINT);
+#elif SYSTIC_TICKINT == DISABLE
+  /* Disable SysTick exception generation (polling mode) */
+  MSYSTIC->CTRL &= (~(1u << SYSTIC_CTRL_TICKINT));
+#else
+#error "Invalid SYSTIC Interrupt Configuration"
+#endif
 }
 
+/*=================================================================================================================*/
 /**
- * @fn     SYSTICK_enumSetPreloadValue
- * @brief  Set the preload value for SysTick timer
- * @param  Copy_u32Value: Value to be loaded (0 to 0x00FFFFFF)
- * @retval ErrorState_t: OK if successful, NOK if error
+ * @fn SYSTIC_vDisable
+ * @brief Disable the SysTick timer
+ * @details Stops the timer by clearing the ENABLE bit in the CTRL register
+ *          This function is used internally by delay functions
  */
-ErrorState_t SYSTICK_enumSetPreloadValue(uint32_t Copy_u32Value)
+static void SYSTIC_vDisable(void)
 {
-  ErrorState_t Local_ErrorState = OK;
+  MSYSTIC->CTRL &= (~(1u << SYSTIC_CTRL_ENABLE));
+}
 
-  if (Copy_u32Value > SYSTICK_LOAD_RELOAD_MSK)
+/*=================================================================================================================*/
+/**
+ * @fn SYSTIC_vEnable
+ * @brief Enable the SysTick timer
+ *
+ * @details Starts the timer by setting the ENABLE bit in the CTRL register
+ *          This function is used internally by delay functions
+ */
+static void SYSTIC_vEnable(void)
+{
+  MSYSTIC->CTRL |= (1u << SYSTIC_CTRL_ENABLE);
+}
+
+/*=================================================================================================================*/
+/**
+ * @fn SYSTIC_vWait
+ * @brief Wait for the SysTick timer to complete counting
+ *
+ * @details Polls the COUNTFLAG bit in the CTRL register until it is set,
+ *          indicating that the counter has reached zero
+ */
+static void SYSTIC_vWait(void)
+{
+  while ((MSYSTIC->CTRL & (1u << SYSTIC_CTRL_COUNTFLAG)) == 0)
+    ;
+}
+
+/*=================================================================================================================*/
+/**
+ * @fn SYSTIC_vDelayMs
+ * @brief Generate a precise millisecond delay
+ *
+ * @param[in] Copy_u32MsTime Delay duration in milliseconds
+ *
+ * @details This function:
+ *          1. Calculates the number of ticks needed based on clock configuration
+ *          2. Handles delays longer than maximum counter value (24-bit) by
+ *             breaking them into multiple shorter delays
+ *          3. Uses polling method to wait for completion
+ *
+ * @note The actual delay might be slightly longer than requested due to:
+ *       - Function call overhead
+ *       - Context switching (if interrupts are enabled)
+ *       - Clock frequency rounding
+ *
+ * @warning For very long delays, consider using a timer or RTC instead
+ */
+void SYSTIC_vDelayMs(uint32_t Copy_u32MsTime)
+{
+  /* Calculate tick time based on clock source */
+#if SYSTIC_CLKSOURCE == CLK_SOURCE_AHB_DIV8
+  float Local_f32TickTimeInMs = 1.0 / (SYSTEM_CLOCK_IN_KHZ / 8.0);
+#elif SYSTIC_CLKSOURCE == CLK_SOURCE_AHB
+  float Local_f32TickTimeInMs = 1.0 / SYSTEM_CLOCK_IN_KHZ;
+#endif
+
+  /* Calculate required number of ticks */
+  uint32_t Local_u32NoOfTicks = Copy_u32MsTime / Local_f32TickTimeInMs;
+
+  /* Check if delay fits in single counter cycle */
+  if (Local_u32NoOfTicks <= SYSTIC_MAX_NO_OF_TICKS)
   {
-    Local_ErrorState = NOK;
+    /* Single cycle delay */
+    MSYSTIC->VAL = 0;                   /* Clear current value */
+    MSYSTIC->LOAD = Local_u32NoOfTicks; /* Load delay value */
+    SYSTIC_vEnable();                   /* Start timer */
+    SYSTIC_vWait();                     /* Wait for completion */
+    SYSTIC_vDisable();                  /* Stop timer */
   }
   else
   {
-    MSYSTIC->LOAD = Copy_u32Value;
-    MSYSTIC->VAL = 0; /* Clear current value */
-  }
-
-  return Local_ErrorState;
-}
-
-/**
- * @fn     SYSTICK_enumGetCurrentValue
- * @brief  Get the current value of SysTick timer
- * @param  Copy_u32Value[out]: Pointer to store current value
- * @retval ErrorState_t: OK if successful, NOK if error
- */
-ErrorState_t SYSTICK_enumGetCurrentValue(uint32_t *Copy_u32Value)
-{
-  ErrorState_t Local_ErrorState = OK;
-
-  if (Copy_u32Value == NULL)
-  {
-    Local_ErrorState = NOK;
-  }
-  else
-  {
-    *Copy_u32Value = MSYSTIC->VAL & SYSTICK_VAL_CURRENT;
-  }
-
-  return Local_ErrorState;
-}
-
-/**
- * @fn     SYSTICK_enumDelayMs
- * @brief  Generate a delay in milliseconds using polling method
- * @param  Copy_u32TimeMs: Time in milliseconds to delay
- * @retval ErrorState_t: OK if successful, NOK if error
- */
-ErrorState_t SYSTICK_enumDelayMs(uint32_t Copy_u32TimeMs)
-{
-  ErrorState_t Local_ErrorState = OK;
-  uint32_t Local_u32Ticks;
-  uint32_t Local_u32PreloadValue;
-
-  /* Calculate number of ticks needed */
-  if (MSYSTIC->CTRL & (1 << SYSTICK_CTRL_CLKSOURCE))
-  {
-    Local_u32Ticks = (SYSTEM_CLOCK_FREQ / 1000) * Copy_u32TimeMs;
-  }
-  else
-  {
-    Local_u32Ticks = (SYSTEM_CLOCK_FREQ / 8000) * Copy_u32TimeMs;
-  }
-
-  /* Check if ticks exceed maximum value */
-  if (Local_u32Ticks > SYSTICK_LOAD_RELOAD_MSK)
-  {
-    Local_ErrorState = NOK;
-  }
-  else
-  {
-    /* Configure SysTick */
-    Local_u32PreloadValue = Local_u32Ticks - 1;
-    MSYSTIC->LOAD = Local_u32PreloadValue;
-    MSYSTIC->VAL = 0;
-    MSYSTIC->CTRL |= (1 << SYSTICK_CTRL_ENABLE); /* Enable counter */
-
-    /* Wait until flag is raised */
-    while (!(MSYSTIC->CTRL & (1 << SYSTICK_CTRL_COUNTFLAG)))
-      ;
-
-    /* Stop timer */
-    MSYSTIC->CTRL &= ~(1 << SYSTICK_CTRL_ENABLE);
-    MSYSTIC->LOAD = 0;
-    MSYSTIC->VAL = 0;
-  }
-
-  return Local_ErrorState;
-}
-
-/**
- * @fn     SYSTICK_enumDelayUs
- * @brief  Generate a delay in microseconds using polling method
- * @param  Copy_u32TimeUs: Time in microseconds to delay
- * @retval ErrorState_t: OK if successful, NOK if error
- */
-ErrorState_t SYSTICK_enumDelayUs(uint32_t Copy_u32TimeUs)
-{
-  ErrorState_t Local_ErrorState = OK;
-  uint32_t Local_u32Ticks;
-  uint32_t Local_u32PreloadValue;
-
-  /* Calculate number of ticks needed */
-  if (MSYSTIC->CTRL & (1 << SYSTICK_CTRL_CLKSOURCE))
-  {
-    Local_u32Ticks = (SYSTEM_CLOCK_FREQ / 1000000) * Copy_u32TimeUs;
-  }
-  else
-  {
-    Local_u32Ticks = (SYSTEM_CLOCK_FREQ / 8000000) * Copy_u32TimeUs;
-  }
-
-  /* Check if ticks exceed maximum value */
-  if (Local_u32Ticks > SYSTICK_LOAD_RELOAD_MSK)
-  {
-    Local_ErrorState = NOK;
-  }
-  else
-  {
-    /* Configure SysTick */
-    Local_u32PreloadValue = Local_u32Ticks - 1;
-    MSYSTIC->LOAD = Local_u32PreloadValue;
-    MSYSTIC->VAL = 0;
-    MSYSTIC->CTRL |= (1 << SYSTICK_CTRL_ENABLE); /* Enable counter */
-
-    /* Wait until flag is raised */
-    while (!(MSYSTIC->CTRL & (1 << SYSTICK_CTRL_COUNTFLAG)))
-      ;
-
-    /* Stop timer */
-    MSYSTIC->CTRL &= ~(1 << SYSTICK_CTRL_ENABLE);
-    MSYSTIC->LOAD = 0;
-    MSYSTIC->VAL = 0;
-  }
-
-  return Local_ErrorState;
-}
-
-/**
- * @fn     SYSTICK_enumSetIntervalSingle
- * @brief  Set up SysTick for single interval interrupt
- * @param  Copy_u32Ticks: Number of ticks before interrupt
- * @param  CallBack: Function to call when interval completes
- * @retval ErrorState_t: OK if successful, NOK if error
- */
-ErrorState_t SYSTICK_enumSetIntervalSingle(uint32_t Copy_u32Ticks, void (*CallBack)(void))
-{
-  ErrorState_t Local_ErrorState = OK;
-
-  if (CallBack == NULL || Copy_u32Ticks > SYSTICK_LOAD_RELOAD_MSK)
-  {
-    Local_ErrorState = NOK;
-  }
-  else
-  {
-    /* Store callback and interval mode */
-    SYSTICK_CallBack = CallBack;
-    SYSTICK_IntervalMode = SYSTICK_SINGLE_INTERVAL;
-
-    /* Configure SysTick */
-    MSYSTIC->LOAD = Copy_u32Ticks - 1;
-    MSYSTIC->VAL = 0;
-    MSYSTIC->CTRL |= (1 << SYSTICK_CTRL_TICKINT); /* Enable interrupt */
-    MSYSTIC->CTRL |= (1 << SYSTICK_CTRL_ENABLE);  /* Enable counter */
-  }
-
-  return Local_ErrorState;
-}
-
-/**
- * @fn     SYSTICK_enumSetIntervalPeriodic
- * @brief  Set up SysTick for periodic interval interrupt
- * @param  Copy_u32Ticks: Number of ticks for each interval
- * @param  CallBack: Function to call when each interval completes
- * @retval ErrorState_t: OK if successful, NOK if error
- */
-ErrorState_t SYSTICK_enumSetIntervalPeriodic(uint32_t Copy_u32Ticks, void (*CallBack)(void))
-{
-  ErrorState_t Local_ErrorState = OK;
-
-  if (CallBack == NULL || Copy_u32Ticks > SYSTICK_LOAD_RELOAD_MSK)
-  {
-    Local_ErrorState = NOK;
-  }
-  else
-  {
-    /* Store callback and interval mode */
-    SYSTICK_CallBack = CallBack;
-    SYSTICK_IntervalMode = SYSTICK_PERIODIC_INTERVAL;
-
-    /* Configure SysTick */
-    MSYSTIC->LOAD = Copy_u32Ticks - 1;
-    MSYSTIC->VAL = 0;
-    MSYSTIC->CTRL |= (1 << SYSTICK_CTRL_TICKINT); /* Enable interrupt */
-    MSYSTIC->CTRL |= (1 << SYSTICK_CTRL_ENABLE);  /* Enable counter */
-  }
-
-  return Local_ErrorState;
-}
-
-/**
- * @fn     SYSTICK_enumStop
- * @brief  Stop the SysTick timer
- * @retval ErrorState_t: OK if successful, NOK if error
- */
-ErrorState_t SYSTICK_enumStop(void)
-{
-  ErrorState_t Local_ErrorState = OK;
-
-  /* Disable counter and interrupt */
-  MSYSTIC->CTRL &= ~(1 << SYSTICK_CTRL_ENABLE);
-  MSYSTIC->CTRL &= ~(1 << SYSTICK_CTRL_TICKINT);
-
-  /* Clear registers */
-  MSYSTIC->LOAD = 0;
-  MSYSTIC->VAL = 0;
-
-  /* Clear callback */
-  SYSTICK_CallBack = NULL;
-
-  return Local_ErrorState;
-}
-
-/**
- * @fn     SysTick_Handler
- * @brief  SysTick interrupt handler
- */
-void SysTick_Handler(void)
-{
-  if (SYSTICK_CallBack != NULL)
-  {
-    if (SYSTICK_IntervalMode == SYSTICK_SINGLE_INTERVAL)
+    /* Handle long delays by breaking into multiple cycles */
+    while (Local_u32NoOfTicks > 0)
     {
-      /* Stop timer in single interval mode */
-      SYSTICK_enumStop();
+      if (Local_u32NoOfTicks > SYSTIC_MAX_NO_OF_TICKS)
+      {
+        /* Load maximum possible value */
+        Local_u32NoOfTicks -= SYSTIC_MAX_NO_OF_TICKS;
+        MSYSTIC->VAL = 0;
+        MSYSTIC->LOAD = SYSTIC_MAX_NO_OF_TICKS;
+        SYSTIC_vEnable();
+        SYSTIC_vWait();
+        SYSTIC_vDisable();
+      }
+      else
+      {
+        /* Load remaining ticks */
+        MSYSTIC->VAL = 0;
+        MSYSTIC->LOAD = Local_u32NoOfTicks;
+        SYSTIC_vEnable();
+        SYSTIC_vWait();
+        SYSTIC_vDisable();
+        break;
+      }
     }
-
-    /* Call the callback function */
-    SYSTICK_CallBack();
   }
 }
+
+/*=================================================================================================================*/
+/**
+ * @fn SYSTIC_vDelayUs
+ * @brief Generate a precise microsecond delay
+ *
+ * @param[in] Copy_u32UsTime Delay duration in microseconds
+ *
+ * @details This function:
+ *          1. Calculates the number of ticks needed based on clock configuration
+ *          2. Handles delays longer than maximum counter value (24-bit) by
+ *             breaking them into multiple shorter delays
+ *          3. Uses polling method to wait for completion
+ *
+ * @note The actual delay might be slightly longer than requested due to:
+ *       - Function call overhead
+ *       - Context switching (if interrupts are enabled)
+ *       - Clock frequency rounding
+ *
+ * @warning For very short delays (<10µs), the actual delay may be longer
+ *          than requested due to function call overhead
+ */
+void SYSTIC_vDelayUs(uint32_t Copy_u32UsTime)
+{
+  /* Calculate tick time based on clock source */
+#if SYSTIC_CLKSOURCE == CLK_SOURCE_AHB_DIV8
+  float Local_f32TickTimeInUs = 1.0 / (SYSTEM_CLOCK_IN_MHZ / 8.0);
+#elif SYSTIC_CLKSOURCE == CLK_SOURCE_AHB
+  float Local_f32TickTimeInUs = 1.0 / SYSTEM_CLOCK_IN_MHZ;
+#endif
+
+  /* Calculate required number of ticks */
+  uint32_t Local_u32NoOfTicks = Copy_u32UsTime / Local_f32TickTimeInUs;
+
+  /* Check if delay fits in single counter cycle */
+  if (Local_u32NoOfTicks <= SYSTIC_MAX_NO_OF_TICKS)
+  {
+    /* Single cycle delay */
+    MSYSTIC->VAL = 0;                   /* Clear current value */
+    MSYSTIC->LOAD = Local_u32NoOfTicks; /* Load delay value */
+    SYSTIC_vEnable();                   /* Start timer */
+    SYSTIC_vWait();                     /* Wait for completion */
+    SYSTIC_vDisable();                  /* Stop timer */
+  }
+  else
+  {
+    /* Handle long delays by breaking into multiple cycles */
+    while (Local_u32NoOfTicks > 0)
+    {
+      if (Local_u32NoOfTicks > SYSTIC_MAX_NO_OF_TICKS)
+      {
+        /* Load maximum possible value */
+        Local_u32NoOfTicks -= SYSTIC_MAX_NO_OF_TICKS;
+        MSYSTIC->VAL = 0;
+        MSYSTIC->LOAD = SYSTIC_MAX_NO_OF_TICKS;
+        SYSTIC_vEnable();
+        SYSTIC_vWait();
+        SYSTIC_vDisable();
+      }
+      else
+      {
+        /* Load remaining ticks */
+        MSYSTIC->VAL = 0;
+        MSYSTIC->LOAD = Local_u32NoOfTicks;
+        SYSTIC_vEnable();
+        SYSTIC_vWait();
+        SYSTIC_vDisable();
+        break;
+      }
+    }
+  }
+}
+
+/*=================================================================================================================*/

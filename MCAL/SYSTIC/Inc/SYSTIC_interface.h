@@ -1,96 +1,60 @@
 /**
  **===========================================================================**
- **<<<<<<<<<<<<<<<<<<<<<<<<<    SYSTIC_interface.h    >>>>>>>>>>>>>>>>>>>>>>>>**
+ **<<<<<<<<<<<<<<<<<<<<<<<<<<    SYSTIC_interface.h    >>>>>>>>>>>>>>>>>>>>>>>**
  **                                                                           **
  **                  Author : Abdallah Abdelmoemen Shehawey                   **
  **                  Layer  : MCAL                                            **
  **                  CPU    : Cortex-M3                                       **
- **                  MCU    : STM32F103C8T6                                   **
+ **                  MCU    : F103C8T6                                        **
  **                  SWC    : SYSTIC                                          **
  **                                                                           **
  **===========================================================================**
  */
-
 #ifndef MCAL_SYSTIC_INTERFACE_H_
 #define MCAL_SYSTIC_INTERFACE_H_
 
 #include <stdint.h>
-#include "ErrorStates.h"
-
-/************************** Clock Source Options **************************/
-typedef enum
-{
-  SYSTICK_CLK_AHB_DIV8 = 0, /* AHB Clock divided by 8 */
-  SYSTICK_CLK_AHB           /* AHB Clock */
-} SYSTICK_CLKSource_t;
-
-/************************** Function Prototypes **************************/
+#include "ErrTypes.h"
 
 /**
- * @fn     SYSTICK_enumInit
- * @brief  Initialize the SysTick timer with configured settings
- * @param  ClockSource: Clock source for SysTick (AHB or AHB/8)
- * @retval ErrorState_t: OK if successful, NOK if error
+ * @fn SYSTIC_vInit
+ * @brief Initialize the SysTick timer with configured settings
+ * @details This function initializes the SysTick timer with the following:
+ *          - Configures the clock source (AHB or AHB/8)
+ *          - Sets up interrupt settings if enabled
+ *          - Prepares the timer for delay operations
+ *
+ * @note Must be called before using any other SYSTIC functions
+ * @warning Ensure proper clock configuration before initialization
  */
-ErrorState_t SYSTICK_enumInit(SYSTICK_CLKSource_t ClockSource);
+void SYSTIC_vInit(void);
 
 /**
- * @fn     SYSTICK_enumSetPreloadValue
- * @brief  Set the preload value for SysTick timer
- * @param  Copy_u32Value: Value to be loaded (0 to 0x00FFFFFF)
- * @retval ErrorState_t: OK if successful, NOK if error
+ * @fn SYSTIC_vDelayMs
+ * @brief Generate a precise millisecond delay using polling method
+ *
+ * @param[in] Copy_u32MsTime Delay duration in milliseconds (1 to 16777215 ms)
+ *
+ * @details Uses the SysTick timer to generate accurate millisecond delays
+ *          by polling the COUNTFLAG bit
+ *
+ * @note This is a blocking function
+ * @warning Maximum delay is limited by the 24-bit counter
  */
-ErrorState_t SYSTICK_enumSetPreloadValue(uint32_t Copy_u32Value);
+void SYSTIC_vDelayMs(uint32_t Copy_u32MsTime);
 
 /**
- * @fn     SYSTICK_enumGetCurrentValue
- * @brief  Get the current value of SysTick timer
- * @param  Copy_u32Value[out]: Pointer to store current value
- * @retval ErrorState_t: OK if successful, NOK if error
+ * @fn SYSTIC_vDelayUs
+ * @brief Generate a precise microsecond delay using polling method
+ *
+ * @param[in] Copy_u32UsTime Delay duration in microseconds (1 to 16777215 µs)
+ *
+ * @details Uses the SysTick timer to generate accurate microsecond delays
+ *          by polling the COUNTFLAG bit
+ *
+ * @note This is a blocking function
+ * @warning For very short delays (<10µs), accuracy may be affected by function call overhead
  */
-ErrorState_t SYSTICK_enumGetCurrentValue(uint32_t *Copy_u32Value);
-
-/**
- * @fn     SYSTICK_enumDelayMs
- * @brief  Generate a delay in milliseconds using polling method
- * @param  Copy_u32TimeMs: Time in milliseconds to delay
- * @retval ErrorState_t: OK if successful, NOK if error
- * @note   This function blocks until the delay is complete
- */
-ErrorState_t SYSTICK_enumDelayMs(uint32_t Copy_u32TimeMs);
-
-/**
- * @fn     SYSTICK_enumDelayUs
- * @brief  Generate a delay in microseconds using polling method
- * @param  Copy_u32TimeUs: Time in microseconds to delay
- * @retval ErrorState_t: OK if successful, NOK if error
- * @note   This function blocks until the delay is complete
- */
-ErrorState_t SYSTICK_enumDelayUs(uint32_t Copy_u32TimeUs);
-
-/**
- * @fn     SYSTICK_enumSetIntervalSingle
- * @brief  Set up SysTick for single interval interrupt
- * @param  Copy_u32Ticks: Number of ticks before interrupt
- * @param  CallBack: Function to call when interval completes
- * @retval ErrorState_t: OK if successful, NOK if error
- */
-ErrorState_t SYSTICK_enumSetIntervalSingle(uint32_t Copy_u32Ticks, void (*CallBack)(void));
-
-/**
- * @fn     SYSTICK_enumSetIntervalPeriodic
- * @brief  Set up SysTick for periodic interval interrupt
- * @param  Copy_u32Ticks: Number of ticks for each interval
- * @param  CallBack: Function to call when each interval completes
- * @retval ErrorState_t: OK if successful, NOK if error
- */
-ErrorState_t SYSTICK_enumSetIntervalPeriodic(uint32_t Copy_u32Ticks, void (*CallBack)(void));
-
-/**
- * @fn     SYSTICK_enumStop
- * @brief  Stop the SysTick timer
- * @retval ErrorState_t: OK if successful, NOK if error
- */
-ErrorState_t SYSTICK_enumStop(void);
+void SYSTIC_vDelayUs(uint32_t Copy_u32UsTime);
 
 #endif /* MCAL_SYSTIC_INTERFACE_H_ */
