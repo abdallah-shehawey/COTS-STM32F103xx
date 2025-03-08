@@ -13,7 +13,7 @@
 
 #include <stdint.h>
 #include "STM32F103xx.h"
-#include "ErrorStates.h"
+#include "ErrTypes.h"
 #include "GPIO_interface.h"
 #include "GPIO_private.h"
 #include "GPIO_config.h"
