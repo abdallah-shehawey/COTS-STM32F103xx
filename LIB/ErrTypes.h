@@ -6,19 +6,19 @@
 #ifndef ERRTYPES_H_
 #define ERRTYPES_H_
 
-#define NULL    0
+#define NULL    ((void *)0)
 
-#define ENABLE  1
-#define DISABLE 0
+#define ENABLE  1u
+#define DISABLE 0u
 
 /* Func States  */
-#define IDLE 0
-#define BUSY 1
+#define IDLE 0u
+#define BUSY 1u
 
 
 typedef enum
 {
-  OK = 0,
+  OK = 0u,
   NOK,
   NULL_POINTER,
   BUSY_STATE,
